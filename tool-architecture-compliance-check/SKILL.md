@@ -39,18 +39,18 @@ Check for these markers in `project_path` (stop at first match):
 
 Record: detected stack, source extensions, exclude dirs, test pattern.
 
-### Step 3 — Detect docs directory
+### Step 3 — Check for non-standard docs location
 
-Check in order (stop at first existing directory):
+The MCP server **automatically** looks for `docs/arch/.architecture.json` when `docs` is not passed. No action needed for the default path.
 
-1. `docs` argument from input — use as-is if provided (relative to project root)
-2. `docs/arch/`
-3. `docs/`
-4. `documentation/`
+Only pass `docs` if the user explicitly provides a path **or** if you find `.architecture.json` outside `docs/arch/`:
 
-If none found, proceed without `docs`. Note it explicitly in the output.
+1. If `docs` argument provided by user → pass it as-is.
+2. If `.architecture.json` exists at `docs/arch/` → **omit `docs`** (server auto-discovers it).
+3. If `.architecture.json` exists at another location (e.g. `docs/`, `documentation/`) → pass that path as `docs`.
+4. If `.architecture.json` not found anywhere → omit `docs`, note it in output (server will use default rules).
 
-> **Note:** If the found directory contains `.architecture.json`, the MCP server loads it automatically as the rules source — no explicit `docs` argument needed when the file is at the default path `docs/arch/.architecture.json`.
+> **Never pass `docs="docs/arch"`** — it is the server default and adds no value.
 
 ### Step 4 — Collect candidate source files
 
@@ -127,7 +127,8 @@ Deduplication: skip files already added in earlier priorities.
 mcp_project_audit_architecture_compliance_check(
     project_path="<resolved path>",
     programming_language="<detected from Step 2>",
-    docs="<detected docs dir, relative to project_path — omit if none found>",
+    # docs — omit if .architecture.json is at docs/arch/ (server auto-discovers it)
+    # docs="<non-standard path>" — only if Step 3 found a non-default location
     include_paths=["<list of selected relative paths>"],
     target_architecture=<from input, or omit>,
     language="<from input, default ru>",
@@ -163,8 +164,10 @@ Do NOT use me for:
 
 **WRONG:** Use `env.*` as a file selection pattern — it matches `.env`, `.env.local`, `.env.production`.
 
-**WRONG:** Call MCP without `docs` when `docs/arch/` exists but `.architecture.json` is absent — server falls back to generic default rules.
+**WRONG:** Pass `docs="docs/arch"` — this is the server default, passing it adds no value and creates misleading noise in the call.
 
 **WRONG:** Call MCP without `include_paths` — server builds snapshot by size, misses interfaces and domain core.
 
-**RIGHT:** Detect stack → collect files → gitignore + denylist → select by significance → call MCP with all three.
+**WRONG:** `.architecture.json` not found anywhere but `docs` is omitted without noting it — server silently falls back to generic default rules and the audit becomes meaningless.
+
+**RIGHT:** Detect stack → collect files → gitignore + denylist → select by significance → call MCP, passing `docs` only for non-standard locations.
